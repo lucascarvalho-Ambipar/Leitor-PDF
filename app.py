@@ -4,53 +4,55 @@ import pandas as pd
 import io
 import zipfile
 
-# 1. Configuração de inicialização da página
+# 1. Configuração de inicialização da página (Barra lateral removida)
 st.set_page_config(
     page_title="AMBIPAR - Gestão de PDFs", 
     page_icon="📄", 
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# 2. Injeção de CSS Avançado para Identidade Visual Corporativa (#D4FF00)
-st.markdown("""
+# 2. Injeção de CSS para o visual Clean (Cinza, Preto e #D4FF00)
+st.markdown('''
 <style>
-    /* Ocultar menus padrões do Streamlit para focar na marca */
+    /* Ocultar menus padrões */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* Estilização Geral do App */
+    /* Fundo Clean Cinza Claro e Texto Padrão Preto */
     .stApp {
-        background-color: #0E1117;
+        background-color: #F4F6F9;
     }
-    
-    /* Banner Superior Corporativo */
+    .stMarkdown, label, p, .stText {
+        color: #000000 !important;
+    }
+    h2, h3 {
+        color: #000000 !important;
+    }
+
+    /* Banner Superior (Fundo muito escuro, letras brancas, detalhes na cor solicitada) */
     .corporate-header {
         background-color: #1A1F2C;
         padding: 25px;
         border-radius: 8px;
         border-left: 8px solid #D4FF00;
         margin-bottom: 25px;
-        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.3);
+        box-shadow: 0px 2px 10px rgba(0,0,0,0.05);
     }
     .corporate-header h1 {
         color: #FFFFFF !important;
         margin: 0 !important;
         font-size: 26px !important;
-        letter-spacing: 0.5px;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
     }
     .corporate-header h1 span {
         color: #D4FF00 !important;
-        font-weight: 800;
     }
     .corporate-header p {
-        color: #9BA3B0 !important;
+        color: #FFFFFF !important;
         margin: 6px 0 0 0 !important;
         font-size: 14px;
     }
 
-    /* Customização de Botões (Cor #D4FF00 com alto contraste) */
+    /* Botões Primários (Fundo #D4FF00 e letra preta) */
     div.stButton > button:first-child {
         background-color: #D4FF00 !important;
         color: #000000 !important;
@@ -58,76 +60,61 @@ st.markdown("""
         border: none !important;
         border-radius: 6px !important;
         padding: 12px 28px !important;
-        box-shadow: 0px 4px 10px rgba(212, 255, 0, 0.15);
-        transition: all 0.3s ease-in-out;
         width: 100%;
+        box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
     }
     div.stButton > button:first-child:hover {
-        background-color: #E5FF33 !important;
-        transform: translateY(-2px);
-        box-shadow: 0px 6px 15px rgba(212, 255, 0, 0.3);
+        background-color: #b5d900 !important;
+        color: #000000 !important;
     }
     
-    /* Botões de Download secundários */
+    /* Botões de Download */
     div.stDownloadButton > button {
-        background-color: transparent !important;
-        color: #D4FF00 !important;
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
         border: 2px solid #D4FF00 !important;
         font-weight: bold !important;
         border-radius: 6px !important;
-        transition: all 0.2s ease;
     }
     div.stDownloadButton > button:hover {
-        background-color: rgba(212, 255, 0, 0.1) !important;
-        color: #D4FF00 !important;
+        background-color: #D4FF00 !important;
+        color: #000000 !important;
     }
 
     /* Customização das Abas (Tabs) */
     button[data-baseweb="tab"] {
-        color: #9BA3B0 !important;
+        color: #555555 !important;
         font-size: 16px !important;
         padding: 12px 20px !important;
     }
     button[data-baseweb="tab"][aria-selected="true"] {
         border-bottom-color: #D4FF00 !important;
-        color: #D4FF00 !important;
+        color: #000000 !important;
         font-weight: bold !important;
     }
 
-    /* Linhas de progresso na cor da marca */
+    /* Barra de progresso na cor da marca */
     div[data-testid="stProgress"] > div > div > div {
         background-color: #D4FF00 !important;
     }
     
-    /* Customização de caixas de texto e inputs */
-    div[data-testid="stMarkdownContainer"] strong {
-        color: #D4FF00;
-    }
+    /* Caixas de notificação (Sucesso, Erro, etc.) forçando texto preto para leitura fácil */
+    div[data-testid="stInfo"] { background-color: #E8F4FD; color: #000000; border-radius: 6px; }
+    div[data-testid="stSuccess"] { background-color: #E6F4EA; color: #000000; border-radius: 6px; }
+    div[data-testid="stWarning"] { background-color: #FFF3E0; color: #000000; border-radius: 6px; }
+    div[data-testid="stError"] { background-color: #FCE8E6; color: #000000; border-radius: 6px; }
 </style>
-""", unsafe_allow_html=True)
+''', unsafe_allow_html=True)
 
-# 3. Barra Lateral (Sidebar) Organizacional
-with st.sidebar:
-    st.image("https://img.icons8.com/color/96/database-administrator.png", width=60)
-    st.markdown("### **Painel de Controle**")
-    st.markdown("---")
-    st.markdown("""
-    **Diretrizes de Uso:**
-    * **Varredura:** Suporta múltiplos arquivos PDFs editáveis para conferência de auditoria e relatórios.
-    * **Unificação:** Otimizado para consolidação de lotes massivos via arquivos compactados (.zip).
-    """)
-    st.markdown("---")
-    st.caption("Desenvolvido para otimização de processos internos e validação de dados em larga escala.")
-
-# 4. Banner Executivo Superior
+# 3. Banner Executivo Superior
 st.markdown("""
 <div class="corporate-header">
-    <h1><span>AMBIPAR</span> — Sistema de Busca e Unificação de PDFs</h1>
-    <p>Plataforma corporativa de automação, auditoria de termos e consolidação de documentos em lote.</p>
+    <h1><span>AMBIPAR</span> - Sistema de Busca e Unificação de PDFs</h1>
+    <p>Plataforma de automação, auditoria de termos e consolidação de documentos em lote.</p>
 </div>
 """, unsafe_allow_html=True)
 
-# 5. Criação das Abas Principais
+# 4. Criação das Abas Principais
 tab1, tab2 = st.tabs(["🔍 Varredura Avançada de Nomes", "🔗 Unificador de Documentos em Lote"])
 
 # ==========================================
@@ -137,7 +124,6 @@ with tab1:
     st.markdown("### Extração e Cruzamento de Dados")
     st.markdown("Insira os documentos e os termos desejados para realizar a busca indexada por página.")
     
-    # Layout em colunas para organizar os inputs de forma simétrica
     col1, col2 = st.columns([1, 1])
     
     with col1:
@@ -172,7 +158,6 @@ with tab1:
             
             st.markdown("### 📊 Relatório de Conformidade")
             
-            # Quadro resumo de checagem direta
             c_enc, c_alt = st.columns([1, 2])
             with c_enc:
                 st.markdown("**Status de Verificação:**")
@@ -180,7 +165,7 @@ with tab1:
                     if nome in termos_encontrados_set:
                         st.write(f"✅ **{nome}**")
                     else:
-                        st.write(f"❌ <span style='color:#FFAAAA;'>{nome}</span>", unsafe_allow_html=True)
+                        st.write(f"❌ <span style='color:#E53935;'>{nome}</span>", unsafe_allow_html=True)
             
             with c_alt:
                 if resultados:
@@ -188,7 +173,6 @@ with tab1:
                     df_resultados = pd.DataFrame(resultados)
                     st.dataframe(df_resultados, use_container_width=True)
                     
-                    # utf-8-sig garante abertura perfeita com acentuação correta no Excel brasileiro
                     csv = df_resultados.to_csv(index=False).encode('utf-8-sig')
                     st.download_button("📥 Exportar Relatório de Auditoria (CSV)", data=csv, file_name="relatorio_auditoria_ambipar.csv", mime="text/csv")
                 else:
@@ -201,10 +185,9 @@ with tab2:
     st.markdown("### Consolidação de Comprovantes e Arquivos Massivos")
     st.markdown("Agilize o processamento compactando os documentos em uma pasta **.zip** antes do envio.")
     
-    with st.container():
-        st.markdown("<div style='background-color: #1A1F2C; padding: 20px; border-radius:6px; margin-bottom:20px;'><strong>Nota de Engenharia:</strong> O upload via pacote compactado (.zip) reduz drasticamente o tráfego de rede do navegador, permitindo a consolidação segura de milhares de registros em alta velocidade.</div>", unsafe_allow_html=True)
+    st.info("💡 **Nota de Engenharia:** O upload via pacote compactado (.zip) reduz o tráfego do navegador, permitindo a consolidação de milhares de registros em alta velocidade.")
         
-        arquivos_para_unir = st.file_uploader("Arraste o lote compactado (.zip) ou PDFs avulsos aqui:", type=["pdf", "zip"], accept_multiple_files=True, key="upload_unificar")
+    arquivos_para_unir = st.file_uploader("Arraste o lote compactado (.zip) ou PDFs avulsos aqui:", type=["pdf", "zip"], accept_multiple_files=True, key="upload_unificar")
 
     if arquivos_para_unir:
         st.markdown("---")
