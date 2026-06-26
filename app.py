@@ -1,10 +1,11 @@
 import streamlit as st
 from pypdf import PdfReader, PdfWriter
+from fpdf import FPDF
 import pandas as pd
 import io
 import zipfile
 
-# 1. Configuração de inicialização da página (Barra lateral removida)
+# 1. Configuração de inicialização da página
 st.set_page_config(
     page_title="AMBIPAR - Gestão de PDFs", 
     page_icon="📄", 
@@ -14,11 +15,9 @@ st.set_page_config(
 # 2. Injeção de CSS para o visual Clean (Cinza, Preto e #D4FF00)
 st.markdown('''
 <style>
-    /* Ocultar menus padrões */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* Fundo Clean Cinza Claro e Texto Padrão Preto */
     .stApp {
         background-color: #F4F6F9;
     }
@@ -29,7 +28,6 @@ st.markdown('''
         color: #000000 !important;
     }
 
-    /* Banner Superior (Fundo muito escuro, letras brancas, detalhes na cor solicitada) */
     .corporate-header {
         background-color: #1A1F2C;
         padding: 25px;
@@ -52,7 +50,6 @@ st.markdown('''
         font-size: 14px;
     }
 
-    /* Botões Primários (Fundo #D4FF00 e letra preta) */
     div.stButton > button:first-child {
         background-color: #D4FF00 !important;
         color: #000000 !important;
@@ -68,7 +65,6 @@ st.markdown('''
         color: #000000 !important;
     }
     
-    /* Botões de Download */
     div.stDownloadButton > button {
         background-color: #FFFFFF !important;
         color: #000000 !important;
@@ -81,7 +77,6 @@ st.markdown('''
         color: #000000 !important;
     }
 
-    /* Customização das Abas (Tabs) */
     button[data-baseweb="tab"] {
         color: #555555 !important;
         font-size: 16px !important;
@@ -93,18 +88,60 @@ st.markdown('''
         font-weight: bold !important;
     }
 
-    /* Barra de progresso na cor da marca */
     div[data-testid="stProgress"] > div > div > div {
         background-color: #D4FF00 !important;
     }
     
-    /* Caixas de notificação (Sucesso, Erro, etc.) forçando texto preto para leitura fácil */
     div[data-testid="stInfo"] { background-color: #E8F4FD; color: #000000; border-radius: 6px; }
     div[data-testid="stSuccess"] { background-color: #E6F4EA; color: #000000; border-radius: 6px; }
     div[data-testid="stWarning"] { background-color: #FFF3E0; color: #000000; border-radius: 6px; }
     div[data-testid="stError"] { background-color: #FCE8E6; color: #000000; border-radius: 6px; }
 </style>
 ''', unsafe_allow_html=True)
+
+# Função auxiliar para gerar o relatório em PDF limpo e profissional
+def gerar_pdf_relatorio(lista_nomes, termos_encontrados_set, resultados):
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Configurar codificação segura para evitar erros com acentos brasileiros
+    def s(texto):
+        return texto.encode('latin-1', 'ignore').decode('latin-1')
+    
+    # Cabeçalho do PDF
+    pdf.set_fill_color(26, 31, 44)
+    pdf.rect(0, 0, 210, 35, 'F')
+    
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_y(12)
+    pdf.cell(0, 10, s("AMBIPAR - Relatório de Auditoria de Termos"), ln=True, align="C")
+    
+    # Corpo do Documento
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_y(45)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 10, s("1. Resumo da Verificação de Nomes:"), ln=True)
+    pdf.ln(2)
+    
+    pdf.set_font("Helvetica", "", 11)
+    for nome in lista_nomes:
+        status = "ENCONTRADO" if nome in termos_encontrados_set else "NAO ENCONTRADO"
+        marcador = "[X]" if status == "ENCONTRADO" else "[ ]"
+        pdf.cell(0, 7, s(f"{marcador} {nome} : {status}"), ln=True)
+    
+    if resultados:
+        pdf.ln(8)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 10, s("2. Detalhes de Localização por Página:"), ln=True)
+        pdf.ln(2)
+        
+        pdf.set_font("Helvetica", "", 10)
+        for res in resultados:
+            linha = f"- Termo: {res['Termo Localizado']} | Arquivo: {res['Arquivo Original']} (Pág. {res['Página Identificada']})"
+            pdf.multi_cell(0, 6, s(linha))
+            
+    return pdf.output()
 
 # 3. Banner Executivo Superior
 st.markdown("""
@@ -168,15 +205,23 @@ with tab1:
                         st.write(f"❌ <span style='color:#E53935;'>{nome}</span>", unsafe_allow_html=True)
             
             with c_alt:
+                st.success(f"Processamento concluído. Gerando documentos de exportação...")
+                df_resultados = pd.DataFrame(resultados)
+                
+                # Exibe a tabela na tela para conferência rápida
                 if resultados:
-                    st.success(f"Processamento concluído. Foram detectadas {len(resultados)} ocorrências dos termos.")
-                    df_resultados = pd.DataFrame(resultados)
                     st.dataframe(df_resultados, use_container_width=True)
-                    
-                    csv = df_resultados.to_csv(index=False).encode('utf-8-sig')
-                    st.download_button("📥 Exportar Relatório de Auditoria (CSV)", data=csv, file_name="relatorio_auditoria_ambipar.csv", mime="text/csv")
-                else:
-                    st.warning("Nenhum dos termos mapeados foi localizado no lote de documentos atual.")
+                
+                # Geração do PDF em memória
+                pdf_data = gerar_pdf_relatorio(lista_nomes, termos_encontrados_set, resultados)
+                
+                # Criação do botão de download do PDF corporativo
+                st.download_button(
+                    label="📥 Baixar Relatório Oficial em PDF",
+                    data=bytes(pdf_data),
+                    file_name="relatorio_auditoria_ambipar.pdf",
+                    mime="application/pdf"
+                )
 
 # ==========================================
 # ABA 2: UNIFICADOR EM LOTE
