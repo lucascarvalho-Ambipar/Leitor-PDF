@@ -118,7 +118,7 @@ st.markdown("""
 tab1, tab2 = st.tabs(["🔍 Busca e Extração de Comprovantes", "🔗 Unificador de Lotes de Arquivos"])
 
 # ==========================================
-# ABA 1: VARREDURA E EXTRAÇÃO (ATUALIZADA)
+# ABA 1: VARREDURA E EXTRAÇÃO
 # ==========================================
 with tab1:
     st.markdown("### Extração Inteligente de Documentos")
@@ -132,78 +132,80 @@ with tab1:
         nomes_busca = st.text_area("Nomes para buscar e extrair (separe por vírgula):", placeholder="Ex: João da Silva, Maria de Souza", height=95)
 
     if uploaded_files_varredura and nomes_busca:
-        lista_nomes = [nome.strip() for nome in nomes_busca.split(",") if nome.strip()]
         
-        st.markdown("---")
-        if st.button("Buscar e Extrair Comprovantes", type="primary", key="btn_varredura"):
-            resultados = []
-            termos_encontrados_set = set()
+        # --- TRAVA DE SEGURANÇA BACKEND PARA ARQUIVOS ---
+        arquivos_invalidos = [f.name for f in uploaded_files_varredura if not f.name.lower().endswith('.pdf')]
+        
+        if arquivos_invalidos:
+            st.error(f"⚠️ Acesso negado para processamento. A ferramenta de busca aceita estritamente arquivos no formato PDF. Arquivo(s) bloqueado(s): {', '.join(arquivos_invalidos)}")
+        else:
+            lista_nomes = [nome.strip() for nome in nomes_busca.split(",") if nome.strip()]
             
-            # Inicializa o gravador de PDF que vai guardar apenas as páginas recortadas
-            pdf_extracao = PdfWriter()
-            teve_extracao = False
-            
-            progresso = st.progress(0)
-            
-            with st.spinner("Lendo arquivos e extraindo as páginas correspondentes..."):
-                for idx, uploaded_file in enumerate(uploaded_files_varredura):
-                    reader = PdfReader(uploaded_file)
-                    # Usamos um Set para garantir que não vamos extrair a mesma página duas vezes 
-                    # caso dois nomes pesquisados estejam no mesmo comprovante.
-                    paginas_ja_extraidas = set()
-                    
-                    for num_pagina in range(len(reader.pages)):
-                        texto = reader.pages[num_pagina].extract_text()
-                        if texto:
-                            for nome in lista_nomes:
-                                if nome.lower() in texto.lower():
-                                    resultados.append({
-                                        "Arquivo Original": uploaded_file.name,
-                                        "Página Extraída": num_pagina + 1,
-                                        "Nome Vinculado": nome
-                                    })
-                                    termos_encontrados_set.add(nome)
-                                    
-                                    # Se a página ainda não foi adicionada ao novo PDF, adicionamos agora
-                                    if num_pagina not in paginas_ja_extraidas:
-                                        pdf_extracao.add_page(reader.pages[num_pagina])
-                                        paginas_ja_extraidas.add(num_pagina)
-                                        teve_extracao = True
+            st.markdown("---")
+            if st.button("Buscar e Extrair Comprovantes", type="primary", key="btn_varredura"):
+                resultados = []
+                termos_encontrados_set = set()
+                
+                pdf_extracao = PdfWriter()
+                teve_extracao = False
+                
+                progresso = st.progress(0)
+                
+                with st.spinner("Lendo arquivos e extraindo as páginas correspondentes..."):
+                    for idx, uploaded_file in enumerate(uploaded_files_varredura):
+                        reader = PdfReader(uploaded_file)
+                        paginas_ja_extraidas = set()
+                        
+                        for num_pagina in range(len(reader.pages)):
+                            texto = reader.pages[num_pagina].extract_text()
+                            if texto:
+                                for nome in lista_nomes:
+                                    if nome.lower() in texto.lower():
+                                        resultados.append({
+                                            "Arquivo Original": uploaded_file.name,
+                                            "Página Extraída": num_pagina + 1,
+                                            "Nome Vinculado": nome
+                                        })
+                                        termos_encontrados_set.add(nome)
                                         
-                    progresso.progress((idx + 1) / len(uploaded_files_varredura))
-            
-            st.markdown("### 📊 Resultado da Operação")
-            
-            c_enc, c_alt = st.columns([1, 2])
-            with c_enc:
-                st.markdown("**Status da Busca:**")
-                for nome in lista_nomes:
-                    if nome in termos_encontrados_set:
-                        st.write(f"✅ **{nome}**")
+                                        if num_pagina not in paginas_ja_extraidas:
+                                            pdf_extracao.add_page(reader.pages[num_pagina])
+                                            paginas_ja_extraidas.add(num_pagina)
+                                            teve_extracao = True
+                                            
+                        progresso.progress((idx + 1) / len(uploaded_files_varredura))
+                
+                st.markdown("### 📊 Resultado da Operação")
+                
+                c_enc, c_alt = st.columns([1, 2])
+                with c_enc:
+                    st.markdown("**Status da Busca:**")
+                    for nome in lista_nomes:
+                        if nome in termos_encontrados_set:
+                            st.write(f"✅ **{nome}**")
+                        else:
+                            st.write(f"❌ <span style='color:#E53935;'>{nome}</span>", unsafe_allow_html=True)
+                
+                with c_alt:
+                    if teve_extracao:
+                        st.success("Busca finalizada! As páginas foram separadas com sucesso.")
+                        
+                        output_pdf = io.BytesIO()
+                        pdf_extracao.write(output_pdf)
+                        output_pdf.seek(0)
+                        
+                        st.download_button(
+                            label="📥 Baixar PDF com Comprovantes Extraídos",
+                            data=output_pdf,
+                            file_name="Comprovantes_Extraidos_Busca.pdf",
+                            mime="application/pdf"
+                        )
+                        
+                        st.markdown("<br>**Referência das extrações (apenas informativo):**", unsafe_allow_html=True)
+                        df_resultados = pd.DataFrame(resultados)
+                        st.dataframe(df_resultados, use_container_width=True)
                     else:
-                        st.write(f"❌ <span style='color:#E53935;'>{nome}</span>", unsafe_allow_html=True)
-            
-            with c_alt:
-                if teve_extracao:
-                    st.success("Busca finalizada! As páginas foram separadas com sucesso.")
-                    
-                    # Salva as páginas extraídas na memória para o download
-                    output_pdf = io.BytesIO()
-                    pdf_extracao.write(output_pdf)
-                    output_pdf.seek(0)
-                    
-                    st.download_button(
-                        label="📥 Baixar PDF com Comprovantes Extraídos",
-                        data=output_pdf,
-                        file_name="Comprovantes_Extraidos_Busca.pdf",
-                        mime="application/pdf"
-                    )
-                    
-                    st.markdown("<br>**Referência das extrações (apenas informativo):**", unsafe_allow_html=True)
-                    df_resultados = pd.DataFrame(resultados)
-                    st.dataframe(df_resultados, use_container_width=True)
-                else:
-                    st.warning("Nenhum comprovante correspondente aos nomes pesquisados foi encontrado neste lote.")
+                        st.warning("Nenhum comprovante correspondente aos nomes pesquisados foi encontrado neste lote.")
 
 # ==========================================
 # ABA 2: UNIFICADOR EM LOTE
