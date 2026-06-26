@@ -1,6 +1,5 @@
 import streamlit as st
 from pypdf import PdfReader, PdfWriter
-from fpdf import FPDF
 import pandas as pd
 import io
 import zipfile
@@ -15,9 +14,11 @@ st.set_page_config(
 # 2. Injeção de CSS para o visual Clean (Cinza, Preto e #D4FF00)
 st.markdown('''
 <style>
+    /* Ocultar menus padrões */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
+    /* Fundo Clean Cinza Claro e Texto Padrão Preto */
     .stApp {
         background-color: #F4F6F9;
     }
@@ -28,6 +29,7 @@ st.markdown('''
         color: #000000 !important;
     }
 
+    /* Banner Superior (Fundo muito escuro, letras brancas, detalhes na cor solicitada) */
     .corporate-header {
         background-color: #1A1F2C;
         padding: 25px;
@@ -50,6 +52,7 @@ st.markdown('''
         font-size: 14px;
     }
 
+    /* Botões Primários (Fundo #D4FF00 e letra preta) */
     div.stButton > button:first-child {
         background-color: #D4FF00 !important;
         color: #000000 !important;
@@ -65,6 +68,7 @@ st.markdown('''
         color: #000000 !important;
     }
     
+    /* Botões de Download */
     div.stDownloadButton > button {
         background-color: #FFFFFF !important;
         color: #000000 !important;
@@ -77,6 +81,7 @@ st.markdown('''
         color: #000000 !important;
     }
 
+    /* Customização das Abas (Tabs) */
     button[data-baseweb="tab"] {
         color: #555555 !important;
         font-size: 16px !important;
@@ -88,10 +93,12 @@ st.markdown('''
         font-weight: bold !important;
     }
 
+    /* Barra de progresso na cor da marca */
     div[data-testid="stProgress"] > div > div > div {
         background-color: #D4FF00 !important;
     }
     
+    /* Caixas de notificação */
     div[data-testid="stInfo"] { background-color: #E8F4FD; color: #000000; border-radius: 6px; }
     div[data-testid="stSuccess"] { background-color: #E6F4EA; color: #000000; border-radius: 6px; }
     div[data-testid="stWarning"] { background-color: #FFF3E0; color: #000000; border-radius: 6px; }
@@ -99,87 +106,52 @@ st.markdown('''
 </style>
 ''', unsafe_allow_html=True)
 
-# Função auxiliar para gerar o relatório em PDF limpo e profissional
-def gerar_pdf_relatorio(lista_nomes, termos_encontrados_set, resultados):
-    pdf = FPDF()
-    pdf.add_page()
-    
-    # Configurar codificação segura para evitar erros com acentos brasileiros
-    def s(texto):
-        return texto.encode('latin-1', 'ignore').decode('latin-1')
-    
-    # Cabeçalho do PDF
-    pdf.set_fill_color(26, 31, 44)
-    pdf.rect(0, 0, 210, 35, 'F')
-    
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.set_y(12)
-    pdf.cell(0, 10, s("AMBIPAR - Relatório de Auditoria de Termos"), ln=True, align="C")
-    
-    # Corpo do Documento
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_y(45)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, s("1. Resumo da Verificação de Nomes:"), ln=True)
-    pdf.ln(2)
-    
-    pdf.set_font("Helvetica", "", 11)
-    for nome in lista_nomes:
-        status = "ENCONTRADO" if nome in termos_encontrados_set else "NAO ENCONTRADO"
-        marcador = "[X]" if status == "ENCONTRADO" else "[ ]"
-        pdf.cell(0, 7, s(f"{marcador} {nome} : {status}"), ln=True)
-    
-    if resultados:
-        pdf.ln(8)
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 10, s("2. Detalhes de Localização por Página:"), ln=True)
-        pdf.ln(2)
-        
-        pdf.set_font("Helvetica", "", 10)
-        for res in resultados:
-            linha = f"- Termo: {res['Termo Localizado']} | Arquivo: {res['Arquivo Original']} (Pág. {res['Página Identificada']})"
-            pdf.multi_cell(0, 6, s(linha))
-            
-    return pdf.output()
-
 # 3. Banner Executivo Superior
 st.markdown("""
 <div class="corporate-header">
-    <h1><span>AMBIPAR</span> - Sistema de Busca e Unificação de PDFs</h1>
-    <p>Plataforma de automação, auditoria de termos e consolidação de documentos em lote.</p>
+    <h1><span>AMBIPAR</span> - Sistema de Busca e Extração de PDFs</h1>
+    <p>Plataforma para localização rápida de comprovantes e consolidação de lotes.</p>
 </div>
 """, unsafe_allow_html=True)
 
 # 4. Criação das Abas Principais
-tab1, tab2 = st.tabs(["🔍 Varredura Avançada de Nomes", "🔗 Unificador de Documentos em Lote"])
+tab1, tab2 = st.tabs(["🔍 Busca e Extração de Comprovantes", "🔗 Unificador de Lotes de Arquivos"])
 
 # ==========================================
-# ABA 1: VARREDURA DE NOMES
+# ABA 1: VARREDURA E EXTRAÇÃO (ATUALIZADA)
 # ==========================================
 with tab1:
-    st.markdown("### Extração e Cruzamento de Dados")
-    st.markdown("Insira os documentos e os termos desejados para realizar a busca indexada por página.")
+    st.markdown("### Extração Inteligente de Documentos")
+    st.markdown("Insira um lote em PDF e os nomes que deseja buscar. O sistema recortará apenas as páginas onde os nomes aparecem e gerará um novo PDF contendo somente estes comprovantes.")
     
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        uploaded_files_varredura = st.file_uploader("Upload de arquivos fontes (PDF)", type=["pdf"], accept_multiple_files=True, key="upload_varredura")
+        uploaded_files_varredura = st.file_uploader("Upload do(s) arquivo(s) fonte (PDF)", type=["pdf"], accept_multiple_files=True, key="upload_varredura")
     with col2:
-        nomes_busca = st.text_area("Termos ou nomes para localização (separe por vírgula):", placeholder="Ex: Nome do Colaborador, Razão Social, Tipo de Lote", height=95)
+        nomes_busca = st.text_area("Nomes para buscar e extrair (separe por vírgula):", placeholder="Ex: João da Silva, Maria de Souza", height=95)
 
     if uploaded_files_varredura and nomes_busca:
         lista_nomes = [nome.strip() for nome in nomes_busca.split(",") if nome.strip()]
         
         st.markdown("---")
-        if st.button("Executar Varredura no Banco de Arquivos", type="primary", key="btn_varredura"):
+        if st.button("Buscar e Extrair Comprovantes", type="primary", key="btn_varredura"):
             resultados = []
             termos_encontrados_set = set()
+            
+            # Inicializa o gravador de PDF que vai guardar apenas as páginas recortadas
+            pdf_extracao = PdfWriter()
+            teve_extracao = False
+            
             progresso = st.progress(0)
             
-            with st.spinner("Processando acervo digital e mapeando termos..."):
+            with st.spinner("Lendo arquivos e extraindo as páginas correspondentes..."):
                 for idx, uploaded_file in enumerate(uploaded_files_varredura):
                     reader = PdfReader(uploaded_file)
+                    # Usamos um Set para garantir que não vamos extrair a mesma página duas vezes 
+                    # caso dois nomes pesquisados estejam no mesmo comprovante.
+                    paginas_ja_extraidas = set()
+                    
                     for num_pagina in range(len(reader.pages)):
                         texto = reader.pages[num_pagina].extract_text()
                         if texto:
@@ -187,17 +159,24 @@ with tab1:
                                 if nome.lower() in texto.lower():
                                     resultados.append({
                                         "Arquivo Original": uploaded_file.name,
-                                        "Página Identificada": num_pagina + 1,
-                                        "Termo Localizado": nome
+                                        "Página Extraída": num_pagina + 1,
+                                        "Nome Vinculado": nome
                                     })
                                     termos_encontrados_set.add(nome)
+                                    
+                                    # Se a página ainda não foi adicionada ao novo PDF, adicionamos agora
+                                    if num_pagina not in paginas_ja_extraidas:
+                                        pdf_extracao.add_page(reader.pages[num_pagina])
+                                        paginas_ja_extraidas.add(num_pagina)
+                                        teve_extracao = True
+                                        
                     progresso.progress((idx + 1) / len(uploaded_files_varredura))
             
-            st.markdown("### 📊 Relatório de Conformidade")
+            st.markdown("### 📊 Resultado da Operação")
             
             c_enc, c_alt = st.columns([1, 2])
             with c_enc:
-                st.markdown("**Status de Verificação:**")
+                st.markdown("**Status da Busca:**")
                 for nome in lista_nomes:
                     if nome in termos_encontrados_set:
                         st.write(f"✅ **{nome}**")
@@ -205,23 +184,26 @@ with tab1:
                         st.write(f"❌ <span style='color:#E53935;'>{nome}</span>", unsafe_allow_html=True)
             
             with c_alt:
-                st.success(f"Processamento concluído. Gerando documentos de exportação...")
-                df_resultados = pd.DataFrame(resultados)
-                
-                # Exibe a tabela na tela para conferência rápida
-                if resultados:
+                if teve_extracao:
+                    st.success("Busca finalizada! As páginas foram separadas com sucesso.")
+                    
+                    # Salva as páginas extraídas na memória para o download
+                    output_pdf = io.BytesIO()
+                    pdf_extracao.write(output_pdf)
+                    output_pdf.seek(0)
+                    
+                    st.download_button(
+                        label="📥 Baixar PDF com Comprovantes Extraídos",
+                        data=output_pdf,
+                        file_name="Comprovantes_Extraidos_Busca.pdf",
+                        mime="application/pdf"
+                    )
+                    
+                    st.markdown("<br>**Referência das extrações (apenas informativo):**", unsafe_allow_html=True)
+                    df_resultados = pd.DataFrame(resultados)
                     st.dataframe(df_resultados, use_container_width=True)
-                
-                # Geração do PDF em memória
-                pdf_data = gerar_pdf_relatorio(lista_nomes, termos_encontrados_set, resultados)
-                
-                # Criação do botão de download do PDF corporativo
-                st.download_button(
-                    label="📥 Baixar Relatório Oficial em PDF",
-                    data=bytes(pdf_data),
-                    file_name="relatorio_auditoria_ambipar.pdf",
-                    mime="application/pdf"
-                )
+                else:
+                    st.warning("Nenhum comprovante correspondente aos nomes pesquisados foi encontrado neste lote.")
 
 # ==========================================
 # ABA 2: UNIFICADOR EM LOTE
