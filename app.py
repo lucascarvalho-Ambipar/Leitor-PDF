@@ -125,4 +125,4 @@ with tab2:
                         key="download_merge"
                     )
                 else:
-                    st.error("Nenhum arquivo PDF foi encontrado dentro do(s) arquivo(s) enviado(s)."
+                    st.error("Nenhum arquivo PDF foi encontrado dentro do(s) arquivo(s) enviado(s).")
