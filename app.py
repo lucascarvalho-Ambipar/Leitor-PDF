@@ -2,21 +2,18 @@ import streamlit as st
 from pypdf import PdfReader, PdfWriter
 import pandas as pd
 import io
+import zipfile
 
 # Configuração da página
 st.set_page_config(page_title="Hub de Automação de PDFs", page_icon="📄", layout="wide")
 
-# Aplicando o toque profissional com a cor #D4FF00 via CSS (barra superior e botões)
+# Aplicando o toque profissional com a cor #D4FF00 via CSS
 st.markdown("""
 <style>
-/* Linha de destaque no topo do site */
-.stApp {
-    border-top: 5px solid #D4FF00;
-}
-/* Estilizando o botão principal para a cor solicitada */
+.stApp { border-top: 5px solid #D4FF00; }
 div.stButton > button:first-child {
     background-color: #D4FF00;
-    color: #000000; /* Texto preto para dar contraste com o verde/amarelo neon */
+    color: #000000;
     font-weight: bold;
     border: none;
     border-radius: 5px;
@@ -31,8 +28,7 @@ div.stButton > button:first-child:hover {
 st.title("📄 Hub de Automação de PDFs")
 st.markdown("Selecione a ferramenta que deseja utilizar nas abas abaixo:")
 
-# Criando as abas do site
-tab1, tab2 = st.tabs(["🔍 Varredura de Nomes", "🔗 Unificador de Comprovantes (Merge)"])
+tab1, tab2 = st.tabs(["🔍 Varredura de Nomes", "🔗 Unificador de Comprovantes em Lote"])
 
 # ==========================================
 # ABA 1: VARREDURA DE NOMES
@@ -50,9 +46,7 @@ with tab1:
         if st.button("Iniciar Varredura", type="primary", key="btn_varredura"):
             resultados = []
             termos_encontrados_set = set()
-            
             progresso = st.progress(0)
-            total_arquivos = len(uploaded_files_varredura)
             
             with st.spinner("Analisando documentos..."):
                 for idx, uploaded_file in enumerate(uploaded_files_varredura):
@@ -68,8 +62,7 @@ with tab1:
                                         "Nome Encontrado": nome
                                     })
                                     termos_encontrados_set.add(nome)
-                    
-                    progresso.progress((idx + 1) / total_arquivos)
+                    progresso.progress((idx + 1) / len(uploaded_files_varredura))
             
             st.subheader("📊 Resultado da Análise")
             if resultados:
@@ -83,43 +76,53 @@ with tab1:
                 st.warning("Nenhum nome localizado.")
 
 # ==========================================
-# ABA 2: UNIFICADOR DE PDFs
+# ABA 2: UNIFICADOR (COM SUPORTE A ZIP)
 # ==========================================
 with tab2:
-    st.header("🔗 Unificar Comprovantes")
-    st.markdown("Junte milhares de PDFs unitários em um único arquivo estruturado.")
+    st.header("🔗 Unificar Comprovantes (Lote/ZIP)")
+    st.markdown("Junte milhares de comprovantes submetendo um único arquivo **.zip** ou PDFs avulsos.")
     
-    # Dica importante para o usuário sobre volume
-    st.info("💡 **Dica de Performance:** Se for processar 4.000 comprovantes, o navegador do seu computador pode ficar lento ao selecionar todos de uma vez. Se isso acontecer, tente fazer upload em lotes (ex: 500 por vez).")
-    
-    arquivos_para_unir = st.file_uploader("Selecione todos os comprovantes (a ordem de seleção será a ordem do PDF final):", type=["pdf"], accept_multiple_files=True, key="upload_unificar")
+    arquivos_para_unir = st.file_uploader("Selecione um arquivo .zip (ou vários PDFs):", type=["pdf", "zip"], accept_multiple_files=True, key="upload_unificar")
 
     if arquivos_para_unir:
-        st.write(f"📁 **{len(arquivos_para_unir)} arquivos carregados e prontos para união.**")
+        st.info("💡 **Dica:** Ao subir um arquivo .zip, o sistema processará todos os PDFs contidos nele em alta velocidade na nuvem.")
         
         if st.button("Unir Arquivos Agora", type="primary", key="btn_unificar"):
             merger = PdfWriter()
+            pdfs_processados = 0
             
-            progresso_merge = st.progress(0)
-            total_merge = len(arquivos_para_unir)
-            
-            with st.spinner("Unindo comprovantes... Isso pode levar alguns segundos dependendo da quantidade."):
-                for idx, pdf in enumerate(arquivos_para_unir):
-                    # Adiciona cada pdf ao objeto merger
-                    merger.append(pdf)
-                    progresso_merge.progress((idx + 1) / total_merge)
+            with st.spinner("Processando e unindo comprovantes... Isso pode levar alguns segundos."):
+                for file in arquivos_para_unir:
+                    # Se for um arquivo ZIP
+                    if file.name.lower().endswith('.zip'):
+                        with zipfile.ZipFile(file) as z:
+                            # Filtra apenas arquivos PDF dentro do ZIP
+                            pdf_names = [n for n in z.namelist() if n.lower().endswith('.pdf')]
+                            
+                            for pdf_name in pdf_names:
+                                with z.open(pdf_name) as f:
+                                    # Lê o PDF da memória do ZIP e adiciona ao unificador
+                                    pdf_bytes = io.BytesIO(f.read())
+                                    merger.append(pdf_bytes)
+                                    pdfs_processados += 1
+                    
+                    # Se for um PDF direto
+                    elif file.name.lower().endswith('.pdf'):
+                        merger.append(file)
+                        pdfs_processados += 1
                 
-                # Salva o arquivo final na memória para download
-                output_pdf = io.BytesIO()
-                merger.write(output_pdf)
-                output_pdf.seek(0)
-                
-            st.success("✅ PDFs unidos com sucesso!")
-            
-            st.download_button(
-                label="📥 Baixar PDF Unificado",
-                data=output_pdf,
-                file_name="Comprovantes_Unificados.pdf",
-                mime="application/pdf",
-                key="download_merge"
-            )
+                if pdfs_processados > 0:
+                    output_pdf = io.BytesIO()
+                    merger.write(output_pdf)
+                    output_pdf.seek(0)
+                    
+                    st.success(f"✅ Sucesso! {pdfs_processados} comprovantes foram extraídos e unidos em um único PDF.")
+                    st.download_button(
+                        label="📥 Baixar PDF Unificado",
+                        data=output_pdf,
+                        file_name="Comprovantes_Lote_Unificado.pdf",
+                        mime="application/pdf",
+                        key="download_merge"
+                    )
+                else:
+                    st.error("Nenhum arquivo PDF foi encontrado dentro do(s) arquivo(s) enviado(s)."
