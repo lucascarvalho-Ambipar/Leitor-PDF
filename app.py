@@ -29,7 +29,7 @@ st.markdown('''
         color: #000000 !important;
     }
 
-    /* Banner Superior (Fundo muito escuro, letras brancas, detalhes na cor solicitada) */
+    /* Banner Superior */
     .corporate-header {
         background-color: #1A1F2C;
         padding: 25px;
@@ -52,7 +52,7 @@ st.markdown('''
         font-size: 14px;
     }
 
-    /* Botões Primários (Fundo #D4FF00 e letra preta) */
+    /* Botões Primários */
     div.stButton > button:first-child {
         background-color: #D4FF00 !important;
         color: #000000 !important;
@@ -93,7 +93,7 @@ st.markdown('''
         font-weight: bold !important;
     }
 
-    /* Barra de progresso na cor da marca */
+    /* Barra de progresso */
     div[data-testid="stProgress"] > div > div > div {
         background-color: #D4FF00 !important;
     }
@@ -122,14 +122,15 @@ tab1, tab2 = st.tabs(["🔍 Busca e Extração de Comprovantes", "🔗 Unificado
 # ==========================================
 with tab1:
     st.markdown("### Extração Inteligente de Documentos")
-    st.markdown("Insira um lote em PDF e os nomes que deseja buscar. O sistema recortará apenas as páginas onde os nomes aparecem e gerará um novo PDF contendo somente estes comprovantes.")
+    st.markdown("Insira um lote em PDF e os termos ou valores que deseja buscar. O sistema recortará apenas as páginas onde eles aparecem e gerará um novo PDF contendo somente estes comprovantes.")
     
     col1, col2 = st.columns([1, 1])
     
     with col1:
         uploaded_files_varredura = st.file_uploader("Upload do(s) arquivo(s) fonte (PDF)", type=["pdf"], accept_multiple_files=True, key="upload_varredura")
     with col2:
-        nomes_busca = st.text_area("Nomes para buscar e extrair (separe por vírgula):", placeholder="Ex: João da Silva, Maria de Souza", height=95)
+        # Texto atualizado para instruir o uso do ponto e vírgula
+        nomes_busca = st.text_area("Termos ou valores para buscar (separe por PONTO E VÍRGULA):", placeholder="Ex: João da Silva; Maria de Souza; 107,54", height=95)
 
     if uploaded_files_varredura and nomes_busca:
         
@@ -139,7 +140,8 @@ with tab1:
         if arquivos_invalidos:
             st.error(f"⚠️ Acesso negado para processamento. A ferramenta de busca aceita estritamente arquivos no formato PDF. Arquivo(s) bloqueado(s): {', '.join(arquivos_invalidos)}")
         else:
-            lista_nomes = [nome.strip() for nome in nomes_busca.split(",") if nome.strip()]
+            # Lógica alterada: agora faz o split (corte) usando o ";" em vez da ","
+            lista_nomes = [nome.strip() for nome in nomes_busca.split(";") if nome.strip()]
             
             st.markdown("---")
             if st.button("Buscar e Extrair Comprovantes", type="primary", key="btn_varredura"):
@@ -164,7 +166,7 @@ with tab1:
                                         resultados.append({
                                             "Arquivo Original": uploaded_file.name,
                                             "Página Extraída": num_pagina + 1,
-                                            "Nome Vinculado": nome
+                                            "Termo Vinculado": nome
                                         })
                                         termos_encontrados_set.add(nome)
                                         
@@ -205,7 +207,7 @@ with tab1:
                         df_resultados = pd.DataFrame(resultados)
                         st.dataframe(df_resultados, use_container_width=True)
                     else:
-                        st.warning("Nenhum comprovante correspondente aos nomes pesquisados foi encontrado neste lote.")
+                        st.warning("Nenhum comprovante correspondente aos termos pesquisados foi encontrado neste lote.")
 
 # ==========================================
 # ABA 2: UNIFICADOR EM LOTE
